@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Triggered from S3 object upload
+Resources:
+  StoreObject:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.store
+      Runtime: python2.7
+      CodeUri: .
+      Policies: 
+        - AmazonS3ReadOnlyAccess
+        - AmazonDynamoDBFullAccess
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref S3ObjectTable
+      Events:
+        ObjectUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref Bucket
+            Events: s3:ObjectCreated:*
+
+  RemoveObject:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.remove 
+      Runtime: python2.7
+      CodeUri: .
+      Policies:
+        - AmazonS3ReadOnlyAccess
+        - AmazonDynamoDBFullAccess
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref S3ObjectTable
+      Events:
+        ObjectRemove:
+          Type: S3
+          Properties:
+            Bucket: !Ref Bucket
+            Events: s3:ObjectRemoved:*
+
+  Bucket:
+    Type: AWS::S3::Bucket
+
+  S3ObjectTable:                   
+    Type: AWS::Serverless::SimpleTable
