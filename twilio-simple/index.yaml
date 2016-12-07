@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Simple Twilio response API
+Resources:
+  Prompt:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.prompt
+      Runtime: python2.7
+      CodeUri: .
+      Events:
+        PostPrompt:
+          Type: Api
+          Properties:
+            Path: /sms/prompt
+            Method: post
