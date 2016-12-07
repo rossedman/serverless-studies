@@ -1,3 +1,7 @@
+# Ignore All Installed Requirements
 *.py
+*.pyc
 */*
+
+# Do not ignore our python
 !index.py
