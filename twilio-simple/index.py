@@ -10,6 +10,6 @@ def prompt(event, context):
                                      to="+12147332344",
                                      from_="+14698045056")
 
-    print message
-    print event
-    print context
+    return {
+        'message' : message.sid
+    }
