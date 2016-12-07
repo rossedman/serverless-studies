@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 Description: Simple Twilio response API
+Parameters:
+  TwilioSid:
+    Description: The Twilio Account ID for the Lambda functions to use 
+    Type: String 
+  TwilioToken:
+    Description: The Twilio Auth Token for the account being used 
+    Type: String
+    NoEcho: true
 Resources:
   Prompt:
     Type: AWS::Serverless::Function
@@ -8,6 +16,12 @@ Resources:
       Handler: index.prompt
       Runtime: python2.7
       CodeUri: .
+      Environment:
+        Variables:
+          TWILIO_SID:
+            Ref: TwilioSid
+          TWILIO_TOKEN: 
+            Ref: TwilioToken
       Events:
         PostPrompt:
           Type: Api

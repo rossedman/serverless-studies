@@ -13,12 +13,14 @@ usage()
 {
     echo ""
     echo "${green}USAGE:${reset}"
-    echo "  ./deploy.sh ${yellow}-s${reset} STACK_NAME ${yellow}-b${reset} S3_BUCKET ${yellow}-o${reset} OUTPUT"
+    echo "  ./deploy.sh ${yellow}-s${reset} STACK_NAME ${yellow}-b${reset} S3_BUCKET ${yellow}-o${reset} OUTPUT ${yellow}-a${reset} TWILIO_AUTH ${yellow}-t${reset} TWILIO_SID"
     echo " "
     echo "${green}OPTIONS:${reset}"
     echo "  ${yellow}-s${reset} Choose a stackname for CloudFormation"
     echo "  ${yellow}-b${reset} s3 bucket name where code will be uploaded"
     echo "  ${yellow}-o${reset} output compiled SAM file, default: output.yaml"
+    echo "  ${yellow}-t${reset} set twilio sid"
+    echo "  ${yellow}-a${reset} set twilio auth token"
     echo "${reset}"
 }
 
@@ -42,11 +44,13 @@ fi
 #
 # Parse options
 #
-while getopts 's:b:o:' flag; do
+while getopts 's:b:o:t:a:' flag; do
   case $flag in
     s) STACK_NAME=${OPTARG} ;;
     b) S3_BUCKET=${OPTARG} ;;
     o) SAM_OUTPUT=${OPTARG} ;;
+    t) TWILIO_SID=${OPTARG} ;;
+    a) TWILIO_AUTH=${OPTARG} ;;
     *)
       usage
       exit
@@ -54,27 +58,13 @@ while getopts 's:b:o:' flag; do
   esac
 done
 
-#
-# Check STACK_NAME is set
-#
-if [ -z "${STACK_NAME}" ]; then
+if [[ -z $STACK_NAME || -z $S3_BUCKET || -z $TWILIO_SID || -z $TWILIO_AUTH ]]; then 
     echo ""
     echo "${red}==> ERROR:${reset}"
-    echo "    STACK_NAME needs to be set before deploying"
+    echo "    Correct flags are not set on command"
     usage
     exit
-fi
-
-#
-# Check S3_BUCKET is set
-#
-if [ -z "${S3_BUCKET}" ]; then
-    echo ""
-    echo "${red}==> ERROR:${reset}"
-    echo "    S3_BUCKET needs to be set before deploying"
-    usage
-    exit
-fi
+fi 
 
 #
 # Set Default SAM File
@@ -96,6 +86,7 @@ echo "${green}==> DEPLOYING${reset}"
 aws cloudformation deploy \
   --template-file $SAM_OUTPUT \
   --stack-name $STACK_NAME \
-  --capabilities CAPABILITY_IAM
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides TwilioSid=$TWILIO_SID TwilioToken=$TWILIO_AUTH
 
 echo "${green}==> COMPLETE${reset}"
