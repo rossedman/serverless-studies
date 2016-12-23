@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A function that processes data from a Kinesis stream.
+Resources:
+  EventProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs4.3
+      CodeUri: .
+      Policies: AmazonEC2FullAccess
+
+  ScheduledRule: 
+    Type: "AWS::Events::Rule"
+    Properties: 
+      Description: "ScheduledRule"
+      ScheduleExpression: "rate(2 minutes)"
+      State: "ENABLED"
+      Targets: 
+        - Arn: !GetAtt EventProcessor.Arn
+          Id: "TargetFunctionV1"
+
+  PermissionForEventsToInvokeLambda: 
+    Type: "AWS::Lambda::Permission"
+    Properties: 
+      FunctionName: !Ref EventProcessor
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ScheduledRule.Arn
