@@ -6,7 +6,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: index.handler
-      Runtime: nodejs4.3
+      Runtime: python2.7
       CodeUri: .
       Policies: AmazonEC2FullAccess
 
