@@ -14,7 +14,7 @@ Resources:
     Type: "AWS::Events::Rule"
     Properties: 
       Description: "TagAuditScheduler"
-      ScheduleExpression: "cron(0 18 * * 5)"
+      ScheduleExpression: "rate(2 minutes)"
       State: "ENABLED"
       Targets: 
         - Arn: !GetAtt TagAuditor.Arn

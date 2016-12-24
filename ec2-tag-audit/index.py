@@ -10,16 +10,22 @@ will set tags on first offense and send reminder, then will destroy
 instances if they continue to be noncompliant.
 """
 from __future__ import print_function
-from datetime import date
+from datetime import datetime, timedelta
 import fnmatch
-import time
+import json
 import boto3
 
 client = boto3.client('ec2')
 
 def handler(event, context):
 
-    # tags that all resources will be checked against
+    ### PARAMETERS ###
+
+    # time resources can be non-compliant in days before termination
+    noncompliant_threshold = 7
+
+    # required tags, and allowed values
+    # allowed values use fnmatch/regex
     required_tags = {
         'environment': [
             'dev',
@@ -29,37 +35,57 @@ def handler(event, context):
         'owner': ['*@gmail.com']
     }
 
+    ### BEGIN AUDIT ###
+
     # audit resources
     noncompliant_instances = []
-    for instance in get_instance_details():
+    compliant_instances = []
+    for instance in get_instance_details(client):
         if not audit_tags(instance['tags'], required_tags):
-            terminate.append(instance['id'])
+            noncompliant_instances.append(instance)
+        else:
+            compliant_instances.append(instance)
 
-    # TODO:
-    #   if node first offense, tag with expiration date (or something similar)
-    #   if expiration date has past, then terminate it
-    #
-    # IDEAS:
-    #   add DynamoDB to store terminations?
-    #   add SNS topic to notify owner's of terminated nodes?
+    # get records broken down by tasks: terminate, set expiration, terminate in future
+    assessed = parse_compliance_status(noncompliant_instances)
 
-    # terminate nodes that are not compliant
-    client.terminate_instances(
-        InstanceIds=noncompliant_instances
-    )
+    # tag expiration dates
+    if assessed['set_expiration']:
+        expiration_date = datetime.now() + timedelta(days=noncompliant_threshold)
+        client.create_tags(
+            Resources=assessed['set_expiration'],
+            Tags=[
+                {
+                    'Key': 'expiration',
+                    'Value': expiration_date.strftime("%Y-%m-%d %H:%M:%S")
+                }
+            ]
+        )
 
-    print(noncompliant_instances)
+    # terminate instances that aren't compliant
+    if assessed['terminate']:
+        client.terminate_instances(
+            InstanceIds=assessed['terminate']
+        )
+        
+    print("Compliant: " + json.dumps(compliant_instances))
+    print("Noncompliant: " + json.dumps(noncompliant_instances))
+    print("Set Expiration Date: " + json.dumps(assessed['set_expiration']))
+    print("To Terminate Soon: " + json.dumps(assessed['terminate_soon']))
+    print("To Terminate: " + json.dumps(assessed['terminate']))
+
+    #print(noncompliant_instances)
     print("Function Complete")
 
 
-def get_instance_details():
+def get_instance_details(ec2_client):
     """ Get Instance Data
 
     Retrieve and compile just the data we need from EC2 instances
     """
 
     # find all instances that are not terminated
-    response = client.describe_instances(
+    response = ec2_client.describe_instances(
         Filters=[
             {
                 'Name': 'instance-state-name',
@@ -85,6 +111,42 @@ def get_instance_details():
     return results
 
 
+def parse_compliance_status(noncompliant_records):
+    """Parse Compliance Status
+
+    Assess non compliant record and determine
+    whether they need to be terminated, future terminated,
+    or expiration date set
+    """
+    to_terminate = []
+    to_set_expiration = []
+    to_terminate_soon = []
+
+    for instance in noncompliant_records:
+        if 'tags' in instance:
+            tag_keys = [t['Key'] for t in instance['tags']]
+            if node_first_offense(tag_keys):
+                to_set_expiration.append(instance['id'])
+            else:
+                for tag in instance['tags']:
+                    if tag['Key'] == 'expiration':
+                        expiration = tag['Value']
+                        break
+
+                if node_past_due(expiration):
+                    to_terminate.append(instance['id'])
+                else:
+                    to_terminate_soon.append(instance['id'])
+        else:
+            to_set_expiration.append(instance['id'])
+
+    return {
+        'terminate': to_terminate,
+        'terminate_soon': to_terminate_soon,
+        'set_expiration': to_set_expiration
+    }
+
+
 def audit_tags(given_tags, required_tags):
     """Audit All Tags
 
@@ -97,9 +159,7 @@ def audit_tags(given_tags, required_tags):
         for tag in given_tags:
             # if tag exist in required_tags, lets check values
             if required_tags.get(tag['Key']):
-                if not validate_tag_value(tag['Value'], required_tags.get(tag['Key'])):
-                    return False
-        return True
+                return validate_tag_value(tag['Value'], required_tags.get(tag['Key']))
     else:
         return False
 
@@ -127,11 +187,32 @@ def validate_tag_value(given_value, accepted_values):
 def validate_tag_keys(given_tag_keys, required_tag_keys):
     """Validate Set Tags
 
-    Audits the keys provided by the resource and compares them to 
-    the required tags. 
+    Audits the keys provided by the resource and compares them to
+    the required tags.
 
-    given_tag_keys: list 
+    given_tag_keys: list
 
     required_tag_keys: list
     """
     return required_tag_keys == list(set(given_tag_keys).intersection(required_tag_keys))
+
+
+def node_first_offense(given_tags):
+    """Node First Offense
+
+    If expiration date hasn't been previously set, retrun True
+    """
+    return 'expiration' not in given_tags
+
+
+def node_past_due(expiration_date):
+    """Node Past Due
+
+    If an expiration date is set on a node, is it past due.
+    If it is past due return true
+
+    Timestamp example: 2016-12-22 09:44:41
+    """
+    return datetime.now() > datetime.strptime(expiration_date, "%Y-%m-%d %H:%M:%S")
+
+

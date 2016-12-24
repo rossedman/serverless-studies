@@ -1,5 +1,40 @@
 
+from datetime import datetime, timedelta
 import index as i
+
+
+def test_parse_compliance_status():
+
+    expiration_past = datetime.now() - timedelta(days=2)
+    expiration_future = datetime.now() + timedelta(days=2)
+
+    records = [
+        {
+            'id': 'i-0c9d6b554167f2bea',
+            'tags': [{'Key': 'environment', 'Value': 'stage'}]
+        },
+        {
+            'id': 'i-064529d714f511dbb',
+            'tags': [{'Key': 'expiration', 'Value': expiration_past.strftime("%Y-%m-%d %H:%M:%S")}]
+        },
+        {
+            'id': 'i-03f4std714f511dbb',
+            'tags': [{
+                'Key': 'expiration', 'Value': expiration_future.strftime("%Y-%m-%d %H:%M:%S")
+            }]
+        },
+        {
+            'id': 'i-sdf098345kjsdf'
+        }
+    ]
+
+    expected = {
+        'terminate': ['i-064529d714f511dbb'],
+        'terminate_soon': ['i-03f4std714f511dbb'],
+        'set_expiration': ['i-0c9d6b554167f2bea', 'i-sdf098345kjsdf']
+    }
+
+    assert i.parse_compliance_status(records) == expected
 
 
 def test_validate_tag_keys():
@@ -64,7 +99,7 @@ def test_audit_tags():
         'owner': ['*']
     }
 
-    assert i.audit_tags(given_tags,required_tags) is True
+    assert i.audit_tags(given_tags, required_tags) is True
 
 
 def test_audit_tags_no_tags():
@@ -102,3 +137,19 @@ def test_audit_tags_lots_of_wildcards():
     }
 
     assert i.audit_tags(given_tags, required_tags) is True
+
+
+def test_is_node_first_offense():
+    given_tags = ['environment', 'owner']
+    assert i.node_first_offense(given_tags) is True
+
+
+def test_is_node_second_offense():
+    given_tags = ['environment', 'owner', 'expiration']
+    assert i.node_first_offense(given_tags) is False
+
+
+def test_node_past_due():
+    expiration_date = datetime.now() - timedelta(days=2)
+    assert i.node_past_due(
+        expiration_date.strftime("%Y-%m-%d %H:%M:%S")) is True
