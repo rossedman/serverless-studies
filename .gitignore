@@ -1,2 +1,11 @@
+# system 
 .DS_Store
+
+# aws files
 output.yaml
+
+# python files 
+*.pyc 
+__pycache__
+.cache
+
