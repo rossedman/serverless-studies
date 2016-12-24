@@ -15,7 +15,12 @@ def handler(event, context):
     terminate the instances.
     """
     to_terminate = []
-    required_tags = ["Something", "Crazy"]
+
+    required_tags = [
+        "environment",
+        "owner"
+    ]
+
     client = boto3.client('ec2')
 
     reservations = client.describe_instances(
