@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A function that audits tags on EC2 instances.
+Resources:
+  TagAuditor:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python2.7
+      CodeUri: .
+      Policies: AmazonEC2FullAccess
+
+  TagAuditScheduler: 
+    Type: "AWS::Events::Rule"
+    Properties: 
+      Description: "TagAuditScheduler"
+      ScheduleExpression: "cron(0 18 * * 5)"
+      State: "ENABLED"
+      Targets: 
+        - Arn: !GetAtt TagAuditor.Arn
+          Id: "TargetFunctionV1"
+
+  PermissionToInvokeTagAuditLambda: 
+    Type: "AWS::Lambda::Permission"
+    Properties: 
+      FunctionName: !Ref TagAuditor
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt TagAuditScheduler.Arn
