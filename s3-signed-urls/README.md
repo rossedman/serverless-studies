@@ -1,7 +1,7 @@
 # S3 Simple Signed URLs
 
 This is a serverless application that users Lambda functions to document when S3
-Objects are created into a DynamoDB table. When objects are created a signed URL
+Objects are created into a DynamoDB table. When objects are created, a signed URL
 is generated and stored alongside the object metadata. When objects are deleted they
 are removed from the table.
 

@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: A function that processes data from a Kinesis stream.
+Description: A function that audits tags on EC2 instances.
 Resources:
-  EventProcessor:
+  TagAuditor:
     Type: AWS::Serverless::Function
     Properties:
       Handler: index.handler
@@ -10,20 +10,20 @@ Resources:
       CodeUri: .
       Policies: AmazonEC2FullAccess
 
-  ScheduledRule: 
+  TagAuditScheduler: 
     Type: "AWS::Events::Rule"
     Properties: 
-      Description: "ScheduledRule"
-      ScheduleExpression: "rate(2 minutes)"
+      Description: "TagAuditScheduler"
+      ScheduleExpression: "cron(0 18 * * 5)"
       State: "ENABLED"
       Targets: 
-        - Arn: !GetAtt EventProcessor.Arn
+        - Arn: !GetAtt TagAuditor.Arn
           Id: "TargetFunctionV1"
 
-  PermissionForEventsToInvokeLambda: 
+  PermissionToInvokeTagAuditLambda: 
     Type: "AWS::Lambda::Permission"
     Properties: 
-      FunctionName: !Ref EventProcessor
+      FunctionName: !Ref TagAuditor
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
-      SourceArn: !GetAtt ScheduledRule.Arn
+      SourceArn: !GetAtt TagAuditScheduler.Arn
