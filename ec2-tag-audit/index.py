@@ -1,6 +1,19 @@
+"""EC2 Tag Auditing
+
+This purpose of this script is to provide a working example
+of how to audit tags and enforce compliance through serverless
+Lambda functions.
+
+This script focuses on enforcing tagging policies. It checks for
+required tags on all EC2 instances, checks for appropriate values,
+will set tags on first offense and send reminder, then will destroy
+instances if they continue to be noncompliant.
+"""
 from __future__ import print_function
-import boto3
+from datetime import date
 import fnmatch
+import time
+import boto3
 
 client = boto3.client('ec2')
 
@@ -17,17 +30,25 @@ def handler(event, context):
     }
 
     # audit resources
-    terminate = []
+    noncompliant_instances = []
     for instance in get_instance_details():
         if not audit_tags(instance['tags'], required_tags):
             terminate.append(instance['id'])
 
+    # TODO:
+    #   if node first offense, tag with expiration date (or something similar)
+    #   if expiration date has past, then terminate it
+    #
+    # IDEAS:
+    #   add DynamoDB to store terminations?
+    #   add SNS topic to notify owner's of terminated nodes?
+
     # terminate nodes that are not compliant
     client.terminate_instances(
-        InstanceIds=terminate
+        InstanceIds=noncompliant_instances
     )
 
-    print(terminate)
+    print(noncompliant_instances)
     print("Function Complete")
 
 
@@ -67,8 +88,8 @@ def get_instance_details():
 def audit_tags(given_tags, required_tags):
     """Audit All Tags
 
-    Assesses the tags in as much detail as possible to reach a conclusion 
-    about the current resource. 
+    Assesses the tags in as much detail as possible to reach a conclusion
+    about the current resource.
     """
     # validate the keys of tags first
     if validate_tag_keys([t['Key'] for t in given_tags], required_tags.keys()):

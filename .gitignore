@@ -8,4 +8,6 @@ output.yaml
 *.pyc 
 __pycache__
 .cache
-
+.coverage
+coverage.xml
+htmlcov
