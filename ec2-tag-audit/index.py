@@ -13,7 +13,6 @@ from __future__ import print_function
 from datetime import datetime, timedelta
 import fnmatch
 import json
-import time
 import boto3
 
 client = boto3.client('ec2')
@@ -22,7 +21,7 @@ def handler(event, context):
 
     ### PARAMETERS ###
 
-    # time resources can be non-compliant before termination
+    # time resources can be non-compliant in days before termination
     noncompliant_threshold = 7
 
     # required tags, and allowed values
@@ -68,9 +67,7 @@ def handler(event, context):
         client.terminate_instances(
             InstanceIds=assessed['terminate']
         )
-
-    # TODO: remove expiration tags from items that now comply
-
+        
     print("Compliant: " + json.dumps(compliant_instances))
     print("Noncompliant: " + json.dumps(noncompliant_instances))
     print("Set Expiration Date: " + json.dumps(assessed['set_expiration']))
