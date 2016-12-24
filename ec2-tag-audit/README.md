@@ -12,5 +12,5 @@ auditing infrastructure frequently.
 ## Deploy
 
 ```
-./deploy.sh -s KinesisStreamApp -b lambdawhatever425 -o output.yaml
+./deploy.sh -s EC2TagAuditApp -b lambdawhatever425 -o output.yaml
 ```
