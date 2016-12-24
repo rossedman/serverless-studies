@@ -1,6 +1,7 @@
 
+from datetime import datetime, timedelta
+import logging
 import index as i
-
 
 def test_validate_tag_keys():
     given_tags = ['environment', 'owner']
@@ -64,7 +65,7 @@ def test_audit_tags():
         'owner': ['*']
     }
 
-    assert i.audit_tags(given_tags,required_tags) is True
+    assert i.audit_tags(given_tags, required_tags) is True
 
 
 def test_audit_tags_no_tags():
@@ -102,3 +103,18 @@ def test_audit_tags_lots_of_wildcards():
     }
 
     assert i.audit_tags(given_tags, required_tags) is True
+
+
+def test_is_node_first_offense():
+    given_tags = ['environment', 'owner']
+    assert i.node_first_offense(given_tags) is True
+
+
+def test_is_node_second_offense():
+    given_tags = ['environment', 'owner', 'expiration']
+    assert i.node_first_offense(given_tags) is False
+
+
+def test_node_past_due():
+    expiration_date = datetime.now() - timedelta(days=2)
+    assert i.node_past_due(expiration_date.strftime("%Y-%m-%d %H:%M:%S")) is True
