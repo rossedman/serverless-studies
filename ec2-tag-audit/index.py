@@ -33,7 +33,7 @@ def handler(event, context):
     noncompliant_instances = []
     for instance in get_instance_details():
         if not audit_tags(instance['tags'], required_tags):
-            terminate.append(instance['id'])
+            noncompliant_instances.append(instance['id'])
 
     # TODO:
     #   if node first offense, tag with expiration date (or something similar)
