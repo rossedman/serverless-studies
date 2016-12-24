@@ -1,50 +1,116 @@
-"""EC2 Tag Audit & Terminate
-
-This lambda will analyze all EC2 resource tags and whatever instances
-do not meet the required_tags array will be terminated.
-
-Notice that in the index.yaml file there is a cron expression. Currently
-this is set to run every Friday at 6PM.
-"""
+from __future__ import print_function
 import boto3
+import fnmatch
+
+client = boto3.client('ec2')
 
 def handler(event, context):
-    """Tag Audit
 
-    Audit tags that are present on running EC2 instances, if they are not
-    terminate the instances.
-    """
-    to_terminate = []
+    # tags that all resources will be checked against
+    required_tags = {
+        'environment': [
+            'dev',
+            'prod',
+            'stage'
+        ],
+        'owner': ['*@gmail.com']
+    }
 
-    required_tags = [
-        "environment",
-        "owner"
-    ]
+    # audit resources
+    terminate = []
+    for instance in get_instance_details():
+        if not audit_tags(instance['tags'], required_tags):
+            terminate.append(instance['id'])
 
-    client = boto3.client('ec2')
-
-    reservations = client.describe_instances(
-        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
-    ).get('Reservations', [])
-
-    instances = sum(
-        [
-            [i for i in r['Instances']]
-            for r in reservations
-        ], []
+    # terminate nodes that are not compliant
+    client.terminate_instances(
+        InstanceIds=terminate
     )
 
-    for ins in instances:
-        if 'Tags' in ins:
-            keys = [d['Key'] for d in ins['Tags']]
-            if keys != required_tags:
-                to_terminate.append(ins['InstanceId'])
-        else:
-            to_terminate.append(ins['InstanceId'])
+    print(terminate)
+    print("Function Complete")
 
-    if to_terminate:
-        client.stop_instances(InstanceIds=to_terminate)
 
-        return {
-            "terminated": to_terminate
-        }
+def get_instance_details():
+    """ Get Instance Data
+
+    Retrieve and compile just the data we need from EC2 instances
+    """
+
+    # find all instances that are not terminated
+    response = client.describe_instances(
+        Filters=[
+            {
+                'Name': 'instance-state-name',
+                'Values': [
+                    'running',
+                    'shutting-down',
+                    'stopped',
+                    'stopping',
+                    'pending'
+                ]
+            }
+        ]
+    )
+
+    # aggregate results into easy format to work with
+    results = []
+    for instance in response['Reservations'][0]['Instances']:
+        results.append({
+            'id': instance.get('InstanceId'),
+            'tags': instance.get('Tags', {})
+        })
+
+    return results
+
+
+def audit_tags(given_tags, required_tags):
+    """Audit All Tags
+
+    Assesses the tags in as much detail as possible to reach a conclusion 
+    about the current resource. 
+    """
+    # validate the keys of tags first
+    if validate_tag_keys([t['Key'] for t in given_tags], required_tags.keys()):
+        # validate values of each tag
+        for tag in given_tags:
+            # if tag exist in required_tags, lets check values
+            if required_tags.get(tag['Key']):
+                if not validate_tag_value(tag['Value'], required_tags.get(tag['Key'])):
+                    return False
+        return True
+    else:
+        return False
+
+
+def validate_tag_value(given_value, accepted_values):
+    """Audit Tag Values
+
+    Will assess the value passed in and determine if it meets the
+    requirements that are contained in the `required_tags` array at
+    the top of the script
+
+    given_value: string
+        The value of the tag we are auditing
+
+    accepted_values: list
+        All of the accepted values that are accepted, wildcards included
+    """
+    for value in accepted_values:
+        if fnmatch.fnmatch(given_value, value):
+            return True
+
+    return False
+
+
+def validate_tag_keys(given_tag_keys, required_tag_keys):
+    """Validate Set Tags
+
+    Audits the keys provided by the resource and compares them to 
+    the required tags. 
+
+    given_tag_keys: list 
+
+    required_tag_keys: list
+    """
+    return required_tag_keys == list(set(given_tag_keys).intersection(required_tag_keys))
